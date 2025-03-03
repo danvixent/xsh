@@ -20,16 +20,30 @@ import (
 )
 
 type Plan struct {
-	PlainHosts           []string
-	Command              string
-	SSHKeyPath           string
-	Output               io.WriteCloser
-	CertificateAlgorithm string
-	ParallelLimit        *int
+	PlainHosts    []string
+	Command       string
+	SSHKeyPath    string
+	Output        io.WriteCloser
+	ParallelLimit *int
 
 	hosts    []Host
 	errgroup errgroup.Group
 	stop     chan struct{}
+}
+
+func NewPlan(plainHosts []string, command string, SSHKeyPath string, outputFile string, parallelLimit *int) (*Plan, error) {
+	p := &Plan{PlainHosts: plainHosts, Command: command, SSHKeyPath: SSHKeyPath, ParallelLimit: parallelLimit}
+
+	if outputFile != "" {
+		f, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open output file: %v", err)
+		}
+
+		p.Output = f
+	}
+
+	return p, nil
 }
 
 type SSHClient struct {
@@ -67,9 +81,6 @@ var (
 const (
 	defaultSSHConfigDir = "~/.ssh/"
 )
-
-func RunCommand() {
-}
 
 func (p *Plan) OpenConns() error {
 	if len(p.PlainHosts) == 0 {
@@ -144,6 +155,20 @@ func (p *Plan) Execute(ctx context.Context) (*Result, error) {
 
 	err := p.executeWG(ctx, result)
 	return result, err
+}
+
+func (p *Plan) WriteResult(result *Result) error {
+	b, err := result.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to marshal result: %v", err)
+	}
+
+	_, err = p.Output.Write(b)
+	if err != nil {
+		return fmt.Errorf("failed to write result to file: %v", err)
+	}
+
+	return nil
 }
 
 // executes with a waitgroup

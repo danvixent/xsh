@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -41,4 +42,8 @@ func (r *Result) AddResult(start, end time.Time, host string, output []byte, err
 	}
 
 	r.Successes = append(r.Successes, result)
+}
+
+func (r *Result) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r)
 }
